@@ -5,8 +5,15 @@
 
 //#define DEBUG_TRANSPOSE
 
+struct Parameters {
+ bool dryRun;
+ bool verbose;
+ std::string outputExt;
+ bool printHelp;
+};
+
 /* Counts the number of lines in a file. */
-int countRows(const char * fileName) {
+int countRows(const char * fileName, Parameters p) {
  int n = 0;	// number of lines
  std::string line;
  std::ifstream in(fileName);
@@ -18,15 +25,15 @@ int countRows(const char * fileName) {
   exit(1);
  }
 
-#ifdef DEBUG_TRANSPOSE
- std::cout << n << " rows in input.\n";
-#endif
+ if (p.verbose) {
+  std::cout << n << " rows in input.\n";
+ }
 
  return n;
 }
 
 /* Counts the number of columns in a file (from first line) */
-int countCols(const char * fileName) {
+int countCols(const char * fileName, Parameters p) {
  int n = 0;		// number of columns
  std::string line;	// string for first line
  std::string junk;	// string for first line
@@ -46,39 +53,18 @@ int countCols(const char * fileName) {
   exit(1);
  }
 
-#ifdef DEBUG_TRANSPOSE
- std::cout << n << " columns in input.\n";
-#endif
+ if (p.verbose) {
+  std::cout << n << " columns in input.\n";
+ }
 
  return n;
 }
 
-void transpose(const char * fileName) {
- int rows = countRows(fileName);
- int cols = countCols(fileName);
+void transpose(const char * fileName, Parameters p) {
+ int rows = countRows(fileName, p);
+ int cols = countCols(fileName, p);
  double * mat = new double [rows*cols];	// matrix of values
- /*
- std::string line;
- std::stringstream is;
- std::string val;	// numerical value read in
 
- // open input stream
- std::ifstream inputFile(fileName);
-
- // read each row
- for (int ii = 0; ii < rows; ii++) {
-  std::getline(inputFile, line);
-  // put line into stringstream
-  is << line;
-  // extract each column
-  for (int jj = 0; jj < rows; jj++) {
-   is >> val;
-   std::cout << val;
-   //std::cout << is;
-  }
-  std::cout << "\n";
- }
- */
  // read input
  int flag;
  FILE * inputFile;
@@ -129,22 +115,23 @@ void transpose(const char * fileName) {
 
  // create string for output file name
  std::string outputFile = fileName;
- std::string outputExt("TR");	// extension for output file name
 
  // find position of last period and insert extension
  size_t pos = outputFile.rfind(".");
  if (pos == std::string::npos) {
-  outputFile.append(outputExt.c_str());
+  outputFile.append(p.outputExt.c_str());
  }
  else {
-  outputFile.insert(pos, outputExt.c_str());
+  outputFile.insert(pos, p.outputExt.c_str());
  }
 #ifdef DEBUG_TRANSPOSE
  std::cout << "output file name is " << outputFile << ".\n";
 #endif
 
  FILE * output;
- output = fopen(outputFile.c_str(), "w");
+ if (!p.dryRun) {
+  output = fopen(outputFile.c_str(), "w");
+ }
 
  // loop over rows (transpose of original columns)
  for (int ii = 0; ii < cols; ii++) {
@@ -154,39 +141,113 @@ void transpose(const char * fileName) {
 #ifdef DEBUG_TRANSPOSE
     std::cout << mat[jj*cols + ii];
 #endif
-    fprintf(output, "%-.10g", mat[jj*cols + ii]);
+    if (!p.dryRun) {
+     fprintf(output, "%-.10g", mat[jj*cols + ii]);
+    }
    }
    else {
 #ifdef DEBUG_TRANSPOSE
     std::cout << " " << mat[jj*cols + ii];
 #endif
-    fprintf(output, " %-.10g", mat[jj*cols + ii]);
+    if (!p.dryRun) {
+     fprintf(output, " %-.10g", mat[jj*cols + ii]);
+    }
    }
   }
 #ifdef DEBUG_TRANSPOSE
   std::cout << "\n";
 #endif
-  fprintf(output, "\n");
+  if (!p.dryRun) {
+   fprintf(output, "\n");
+  }
  }
 
- fclose(output);
+ if (!p.dryRun) {
+  fclose(output);
+ }
  
  return;
 }
 
 int main (int argc, char ** argv) {
+ char c;	// parameter for parsing arguments
+
+ Parameters p;
+ p.dryRun = false;
+ p.verbose = false;
+ p.outputExt = "TR";
+ p.printHelp = false;
+
+ /* process command line options */
+ while ((c = getopt(argc, argv, "dho:v")) != -1) {
+  switch (c) {
+   case 'd':
+    if (p.verbose) {
+     std::cout << "Perform dry run (no output).\n";
+    }
+    p.dryRun = true;
+    break;
+   case 'h':
+    if (p.verbose) {
+     std::cout << "Print help.\n";
+    }
+    p.printHelp = true;
+    break;
+   case 'v':
+    std::cout << "Print verbose information.\n";
+    p.verbose = true;
+    break;
+   case 'o':
+    p.outputExt = optarg;
+    if (p.verbose) {
+     std::cout << "Specifying output filename pre-extension: " << p.outputExt << ".\n";
+    }
+    break;
+   case '?':
+    if (optopt == 'o') {
+     fprintf(stderr, "Option -%c requires a filename extension argument.\n", optopt);
+    }
+    else if (isprint(optopt)) {
+     fprintf(stderr, "Unknown option -%c.\n", optopt);
+    }
+    else {
+     fprintf(stderr, "Unknown option character `\\x%x'.\n", optopt);
+    }
+    return 1;
+   default:
+    continue;
+  }
+ }
+
+ if (p.printHelp) {
+  std::cout << "\n"
+            << "transpose: a utility for transposing 2D matrices.\n"
+            << "Usage: transpose [-d] [-h] [-o] ext [-v] inputfile\n"
+	    << "\n"
+	    << "-d: Dry run (create no output).\n"
+	    << "-h: Print this help message.\n"
+	    << "-o: Specify a filename extension. The default is to append 'TR' to the\n"
+	    << "    filename, e.g. input.dat --> inputTR.dat.\n"
+	    << "-v: Print verbose information about what the program is doing.\n"
+	    << "\n"
+	    << "transpose will try to be smart about not accepting inputs where the matrix\n"
+	    << "is not rectangular, i.e. containing any line where the number of records is\n"
+	    << "not the same as in the first line.\n"
+	    << "\n";
+  return 0;
+ }
+
  // get file name
- char * inputFile = argv[1];
+ if (argc == optind) {
+  std::cerr << "BOGUS!  You did not provide a file name.\n";
+  return 1;
+ }
+ char * inputFile = argv[optind];
 #ifdef DEBUG_TRANSPOSE
  std::cout << "Input file name is " << inputFile << "\n";
 #endif
 
- if (inputFile == NULL) {
-  std::cerr << "Bogus!  You did not provide a file name.\n";
-  return 1;
- }
-
- transpose(inputFile);
+ transpose(inputFile, p);
 
  return 0;
 }
