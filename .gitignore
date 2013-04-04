@@ -14,4 +14,8 @@
 
 # junk files
 *.*un~
+*un~
 *.*swp
+
+# transposed matrices
+*TR*

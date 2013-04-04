@@ -124,9 +124,10 @@ void transpose(const char * fileName, Parameters p) {
  else {
   outputFile.insert(pos, p.outputExt.c_str());
  }
-#ifdef DEBUG_TRANSPOSE
- std::cout << "output file name is " << outputFile << ".\n";
-#endif
+
+ if (p.verbose) {
+  std::cout << "Output file name is " << outputFile << ".\n";
+ }
 
  FILE * output;
  if (!p.dryRun) {
@@ -237,17 +238,21 @@ int main (int argc, char ** argv) {
   return 0;
  }
 
- // get file name
+ // get inputs
  if (argc == optind) {
   std::cerr << "BOGUS!  You did not provide a file name.\n";
   return 1;
  }
- char * inputFile = argv[optind];
-#ifdef DEBUG_TRANSPOSE
- std::cout << "Input file name is " << inputFile << "\n";
-#endif
 
- transpose(inputFile, p);
+ char * inputFile = NULL;
+
+ for (int ii = optind; ii < argc; ii++) {
+  inputFile = argv[ii];
+  if (p.verbose) {
+   std::cout << "Input file name is " << inputFile << "\n";
+  }
+  transpose(inputFile, p);
+ }
 
  return 0;
 }
