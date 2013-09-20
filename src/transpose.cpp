@@ -2,6 +2,7 @@
 #include <sstream>
 #include <fstream>
 #include <cstdlib>
+#include <unistd.h>
 
 //#define DEBUG_TRANSPOSE
 
